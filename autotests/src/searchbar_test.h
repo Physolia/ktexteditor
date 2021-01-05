@@ -59,6 +59,8 @@ private Q_SLOTS:
 
     void testReplaceDollar();
 
+    void testReplaceCurrentMatchOnly();
+
     void testSearchHistoryIncremental();
     void testSearchHistoryPower();
 

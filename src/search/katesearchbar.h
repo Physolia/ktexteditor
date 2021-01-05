@@ -54,6 +54,8 @@ public:
 
     enum SearchDirection { SearchForward, SearchBackward };
 
+    enum ReplaceBehavior { ReplaceAndFind, ReplaceOnly };
+
 public:
     explicit KateSearchBar(bool initAsPower, KTextEditor::ViewPrivate *view, KateViewConfig *config);
     ~KateSearchBar() override;
@@ -93,6 +95,8 @@ public Q_SLOTS:
 
     // PowerMode stuff
     void findAll();
+    void replace(KateSearchBar::ReplaceBehavior replaceBehavior);
+    void replaceOnly();
     void replaceNext();
     void replaceAll();
 
@@ -152,7 +156,7 @@ private:
     {
         return findOrReplace(searchDirection, nullptr);
     };
-    bool findOrReplace(SearchDirection searchDirection, const QString *replacement);
+    bool findOrReplace(SearchDirection searchDirection, const QString *replacement, ReplaceBehavior replaceBehavior = ReplaceAndFind);
 
     /**
      * The entry point to start a search & replace task.

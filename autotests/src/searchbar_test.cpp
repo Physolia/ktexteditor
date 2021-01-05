@@ -608,6 +608,40 @@ void SearchBarTest::testReplaceDollar()
     QCOMPARE(doc.text(), QString("aaaD\nbbbD\ncccD\nD\nD\naaaD\nbbbD\ncccD\ndddD\n"));
 }
 
+void SearchBarTest::testReplaceCurrentMatchOnly()
+{
+    KTextEditor::DocumentPrivate doc;
+    KTextEditor::ViewPrivate view(&doc, nullptr);
+    KateViewConfig config(&view);
+
+    doc.setText("a a a ");
+
+    KateSearchBar bar(true, &view, &config);
+    bar.setSearchPattern("a ");
+    bar.setReplacementPattern("b ");
+
+    view.setCursorPosition(Cursor(0, 0));
+    // Try replaceOnly() with no match selected
+    bar.replaceOnly();
+    // Nothing happens
+    QCOMPARE(view.cursorPosition(), Cursor(0, 0));
+    QVERIFY(!view.selection());
+
+    bar.findNext();
+    QCOMPARE(view.selectionRange(), Range(0, 0, 0, 2));
+    // Replace currently selected match only
+    bar.replaceOnly();
+    QCOMPARE(doc.text(), QStringLiteral("b a a "));
+    QCOMPARE(view.cursorPosition(), Cursor(0, 2));
+    QVERIFY(view.selectionText().isEmpty());
+
+    // Find next match, and then replaceNext(), which should replace then find/select next match
+    bar.findNext();
+    bar.replaceNext();
+    QCOMPARE(doc.text(), QStringLiteral("b b a "));
+    QCOMPARE(view.selectionRange(), Range(0, 4, 0, 6));
+}
+
 void SearchBarTest::testSearchHistoryIncremental()
 {
     KTextEditor::DocumentPrivate doc;

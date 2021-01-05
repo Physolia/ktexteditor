@@ -206,12 +206,22 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="replaceNext">
+        <widget class="QPushButton" name="replaceOnly">
          <property name="toolTip">
-          <string>Replace next match</string>
+          <string>Replace currently selected match only</string>
          </property>
          <property name="text">
-          <string>&amp;Replace</string>
+          <string>Replace</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="replaceNext">
+         <property name="toolTip">
+          <string>Replace selected match &amp; find the next one</string>
+         </property>
+         <property name="text">
+          <string>&amp;Replace &amp;&amp; Find</string>
          </property>
         </widget>
        </item>

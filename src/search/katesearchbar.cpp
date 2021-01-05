@@ -473,7 +473,9 @@ void KateSearchBar::onReturnPressed()
     }
 }
 
-bool KateSearchBar::findOrReplace(SearchDirection searchDirection, const QString *replacement)
+bool KateSearchBar::findOrReplace(SearchDirection searchDirection,
+                                  const QString *replacement,
+                                  KateSearchBar::ReplaceBehavior replaceBehavior /* ReplaceAndFind */)
 {
     // What to find?
     if (searchPattern().isEmpty()) {
@@ -488,12 +490,15 @@ bool KateSearchBar::findOrReplace(SearchDirection searchDirection, const QString
 
     const SearchOptions enabledOptions = searchOptions(searchDirection);
 
+    const bool selectionOnlyOrReplaceOnly = selectionOnly() || replaceBehavior == KateSearchBar::ReplaceOnly;
+
     // Where to find?
     Range inputRange;
     const Range selection = m_view->selection() ? m_view->selectionRange() : Range::invalid();
     if (selection.isValid()) {
-        if (selectionOnly()) {
-            // First match in selection
+        if (selectionOnlyOrReplaceOnly) {
+            // First match in selection or
+            // ReplaceOnly mode which replaces the currently selected match only
             inputRange = selection;
         } else {
             // Next match after/before selection if a match was selected before
@@ -531,7 +536,7 @@ bool KateSearchBar::findOrReplace(SearchDirection searchDirection, const QString
                 delete smartInputRange;
             }
 
-            if (!selectionOnly()) {
+            if (!selectionOnlyOrReplaceOnly) {
                 // Find, second try after old selection
                 if (searchDirection == SearchForward) {
                     const Cursor start = (replacement != nullptr) ? afterReplace.end() : selection.end();
@@ -561,7 +566,7 @@ bool KateSearchBar::findOrReplace(SearchDirection searchDirection, const QString
         }
     }
 
-    bool askWrap = !match.isValid() && (!selection.isValid() || !selectionOnly());
+    bool askWrap = !match.isValid() && (!selection.isValid() || !selectionOnlyOrReplaceOnly);
     bool wrap = false;
 
     if (askWrap) {
@@ -637,6 +642,7 @@ void KateSearchBar::givePatternFeedback()
     // Enable/disable next/prev and replace next/all
     m_powerUi->findNext->setEnabled(isPatternValid());
     m_powerUi->findPrev->setEnabled(isPatternValid());
+    m_powerUi->replaceOnly->setEnabled(isPatternValid());
     m_powerUi->replaceNext->setEnabled(isPatternValid());
     m_powerUi->replaceAll->setEnabled(isPatternValid());
     m_powerUi->findAll->setEnabled(isPatternValid());
@@ -706,11 +712,25 @@ void KateSearchBar::sendConfig()
     m_config->setSearchFlags(futureFlags);
 }
 
+void KateSearchBar::replaceOnly()
+{
+    if (!m_view->selection()) {
+        return;
+    }
+
+    replace(KateSearchBar::ReplaceOnly);
+}
+
 void KateSearchBar::replaceNext()
+{
+    replace(KateSearchBar::ReplaceAndFind);
+}
+
+void KateSearchBar::replace(KateSearchBar::ReplaceBehavior replaceBehavior)
 {
     const QString replacement = m_powerUi->replacement->currentText();
 
-    if (findOrReplace(SearchForward, &replacement)) {
+    if (findOrReplace(SearchForward, &replacement, replaceBehavior)) {
         // Never merge replace actions with other replace actions/user actions
         m_view->doc()->undoManager()->undoSafePoint();
 
@@ -736,6 +756,7 @@ void KateSearchBar::beginFindOrReplaceAll(Range inputRange, const QString &repla
         m_powerUi->searchCancelStacked->setCurrentIndex(m_powerUi->searchCancelStacked->indexOf(m_powerUi->cancelPage));
         m_powerUi->findNext->setEnabled(false);
         m_powerUi->findPrev->setEnabled(false);
+        m_powerUi->replaceOnly->setEnabled(false);
         m_powerUi->replaceNext->setEnabled(false);
     }
 
@@ -891,6 +912,7 @@ void KateSearchBar::endFindOrReplaceAll()
         m_powerUi->searchCancelStacked->setCurrentIndex(m_powerUi->searchCancelStacked->indexOf(m_powerUi->searchPage));
         m_powerUi->findNext->setEnabled(true);
         m_powerUi->findPrev->setEnabled(true);
+        m_powerUi->replaceOnly->setEnabled(true);
         m_powerUi->replaceNext->setEnabled(true);
 
         // Add to search history
@@ -1377,6 +1399,7 @@ void KateSearchBar::enterPowerMode()
         connect(m_powerUi->findNext, &QToolButton::clicked, this, &KateSearchBar::findNext);
         connect(m_powerUi->findPrev, &QToolButton::clicked, this, &KateSearchBar::findPrevious);
         connect(m_powerUi->replaceNext, &QPushButton::clicked, this, &KateSearchBar::replaceNext);
+        connect(m_powerUi->replaceOnly, &QPushButton::clicked, this, &KateSearchBar::replaceOnly);
         connect(m_powerUi->replaceAll, &QPushButton::clicked, this, &KateSearchBar::replaceAll);
         connect(m_powerUi->searchMode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &KateSearchBar::onPowerModeChanged);
         connect(m_powerUi->matchCase, &QToolButton::toggled, this, &KateSearchBar::onMatchCaseToggled);
@@ -1688,6 +1711,8 @@ void KateSearchBar::slotReadWriteChanged()
     }
 
     // perhaps disable/enable
-    m_powerUi->replaceNext->setEnabled(m_view->doc()->isReadWrite() && isPatternValid());
-    m_powerUi->replaceAll->setEnabled(m_view->doc()->isReadWrite() && isPatternValid());
+    const bool shouldEnable = m_view->doc()->isReadWrite() && isPatternValid();
+    m_powerUi->replaceOnly->setEnabled(shouldEnable);
+    m_powerUi->replaceNext->setEnabled(shouldEnable);
+    m_powerUi->replaceAll->setEnabled(shouldEnable);
 }
