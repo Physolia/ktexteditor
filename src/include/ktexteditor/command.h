@@ -2,6 +2,7 @@
     SPDX-FileCopyrightText: 2005 Christoph Cullmann <cullmann@kde.org>
     SPDX-FileCopyrightText: 2005-2006 Dominik Haumann <dhdev@gmx.de>
     SPDX-FileCopyrightText: 2008 Erlend Hamberg <ehamberg@gmail.com>
+    SPDX-FileCopyrightText: 2021 Waqar Ahmed <waqar.17a@gmail.com>
 
     SPDX-License-Identifier: LGPL-2.0-or-later
 */
@@ -188,6 +189,51 @@ private:
     class CommandPrivate *const d;
 };
 
+/**
+ * \brief Command extension interface version 2
+ *
+ * \section cmdextv2_intro Introduction
+ *
+ * The CommandV2 allows to do the same as Command
+ * and additionally
+ * - (1) allows another method @c run() which can take arguments
+ * and return data in a QVariantMap
+ *
+ * The basic purpose of this interface is to allow communication
+ * between different components/plugins of an app using KTextEditor.
+ *
+ * \endcode
+ *
+ * \since 5.81
+ */
+class KTEXTEDITOR_EXPORT CommandV2 : public Command
+{
+    Q_OBJECT
+
+public:
+    CommandV2(const QStringList &cmds, QObject *parent = nullptr)
+        : Command(cmds, parent)
+    {
+    }
+
+    virtual ~CommandV2()
+    {
+    }
+
+    /**
+     * Execute the command \p cmd with \p args.
+     *
+     * \p args can be some data that the command needs internally
+     * to run some internal function.
+     *
+     * An example of this could be a "getProjectFiles" command. A plugin
+     * 'project' implements this command and other plugins can use this
+     * command to get available project files.
+     *
+     * \return \c data in a QVariantMap
+     */
+    virtual QVariantMap run(const QString &cmd, const QVariantMap &args = QVariantMap()) = 0;
+};
 }
 
 #endif
