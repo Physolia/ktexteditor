@@ -1047,10 +1047,10 @@ public:
      * Same as plainKateTextLine(), except that it is made sure
      * the line is highlighted.
      */
-    Kate::TextLine kateTextLine(int i);
+    QString kateTextLine(int i);
 
     //! @copydoc KateBuffer::plainLine()
-    Kate::TextLine plainKateTextLine(int i);
+    QString plainKateTextLine(int i);
 
 Q_SIGNALS:
     void aboutToRemoveText(KTextEditor::Range);

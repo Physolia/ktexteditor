@@ -620,8 +620,8 @@ void KateViewTest::testFindMatchingFoldingMarker()
     KTextEditor::ViewPrivate *view = new KTextEditor::ViewPrivate(&doc, nullptr);
     KateViewInternal *viewInternal = view->getViewInternal();
 
-    const int ifvalue = doc.buffer().plainLine(1)->foldings()[0].foldingValue;
-    const int dovalue = doc.buffer().plainLine(0)->foldings()[0].foldingValue;
+    const int ifvalue = doc.buffer().lineFoldings(1)[0].foldingValue;
+    const int dovalue = doc.buffer().lineFoldings(0)[0].foldingValue;
 
     const KTextEditor::Range firstDo(0, 16, 0, 18);
     const KTextEditor::Range firstDoMatching(5, 0, 5, 4);

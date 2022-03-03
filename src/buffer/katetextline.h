@@ -134,13 +134,13 @@ public:
      * Returns the position of the first non-whitespace character
      * @return position of first non-whitespace char or -1 if there is none
      */
-    int firstChar() const;
+    static int firstChar(const QString &text);
 
     /**
      * Returns the position of the last non-whitespace character
      * @return position of last non-whitespace char or -1 if there is none
      */
-    int lastChar() const;
+    static int lastChar(const QString &text);
 
     /**
      * Find the position of the next char that is not a space.
@@ -148,7 +148,7 @@ public:
      * @return True if the specified or a following character is not a space
      *          Otherwise false.
      */
-    int nextNonSpaceChar(int pos) const;
+    static int nextNonSpaceChar(const QString &text, int pos);
 
     /**
      * Find the position of the previous char that is not a space.
@@ -156,7 +156,7 @@ public:
      * @return The position of the first non-whitespace character preceding pos,
      *   or -1 if none is found.
      */
-    int previousNonSpaceChar(int pos) const;
+    static int previousNonSpaceChar(const QString &text, int pos);
 
     /**
      * Returns the character at the given \e column. If \e column is out of
@@ -312,34 +312,34 @@ public:
      * Leading whitespace of this line
      * @return leading whitespace of this line
      */
-    QString leadingWhitespace() const;
+    static QString leadingWhitespace(const QString &text);
 
     /**
      * Returns the indentation depth with each tab expanded into \e tabWidth characters.
      */
-    int indentDepth(int tabWidth) const;
+    static int indentDepth(const QString &text, int tabWidth);
 
     /**
      * Returns the \e column with each tab expanded into \e tabWidth characters.
      */
-    int toVirtualColumn(int column, int tabWidth) const;
+    static int toVirtualColumn(const QString &text, int column, int tabWidth);
 
     /**
      * Returns the "real" column where each tab only counts one character.
      * The conversion calculates with \e tabWidth characters for each tab.
      */
-    int fromVirtualColumn(int column, int tabWidth) const;
+    static int fromVirtualColumn(const QString &text, int column, int tabWidth);
 
     /**
      * Returns the text length with each tab expanded into \e tabWidth characters.
      */
-    int virtualLength(int tabWidth) const;
+    static int virtualLength(const QString &text, int tabWidth);
 
     /**
      * Returns \e true, if \e match equals to the text at position \e column,
      * otherwise returns \e false.
      */
-    bool matchesAt(int column, const QString &match) const;
+    static bool matchesAt(const QString &text, int column, const QString &match);
 
     /**
      * Returns \e true, if the line starts with \e match, otherwise returns \e false.
@@ -480,10 +480,10 @@ private:
 };
 
 /**
- * The normal world only accesses the text lines with shared pointers.
+ * The normal world only accesses the text lines with unique pointers.
  */
-typedef QSharedPointer<TextLineData> TextLine;
-
+typedef std::unique_ptr<TextLineData> TextLinePtr;
+typedef TextLineData *TextLine;
 }
 
 #endif

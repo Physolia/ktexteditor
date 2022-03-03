@@ -703,7 +703,7 @@ void KateRenderer::paintTextLine(QPainter &paint, KateLineLayoutPtr range, int x
             // Draw indent lines
             if (!m_printerFriendly && (indentLinesEnabled && i == 0)) {
                 const qreal w = spaceWidth();
-                const int lastIndentColumn = range->textLine()->indentDepth(m_tabWidth);
+                const int lastIndentColumn = Kate::TextLineData::indentDepth(range->textLine()->text(), m_tabWidth);
                 for (int x = m_indentWidth; x < lastIndentColumn; x += m_indentWidth) {
                     paintIndentMarker(paint, x * w + 1 - xStart, range->line());
                 }
@@ -739,7 +739,7 @@ void KateRenderer::paintTextLine(QPainter &paint, KateLineLayoutPtr range, int x
             // draw trailing spaces
             if (showSpaces() != KateDocumentConfig::None) {
                 int spaceIndex = line.endCol() - 1;
-                const int trailingPos = showSpaces() == KateDocumentConfig::All ? 0 : qMax(range->textLine()->lastChar(), 0);
+                const int trailingPos = showSpaces() == KateDocumentConfig::All ? 0 : qMax(Kate::TextLineData::lastChar(range->textLine()->text()), 0);
 
                 if (spaceIndex >= trailingPos) {
                     for (; spaceIndex >= line.startCol(); --spaceIndex) {
@@ -1119,7 +1119,7 @@ void KateRenderer::layoutLine(KateLineLayoutPtr lineLayout, int maxwidth, bool c
         if (needShiftX && line.width() > 0) {
             needShiftX = false;
             // Determine x offset for subsequent-lines-of-paragraph indenting
-            int pos = textLine->nextNonSpaceChar(0);
+            int pos = Kate::TextLineData::nextNonSpaceChar(textLine->text(), 0);
 
             if (pos > 0) {
                 shiftX = (int)line.cursorToX(pos);

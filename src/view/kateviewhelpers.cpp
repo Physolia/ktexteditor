@@ -609,18 +609,14 @@ void KateScrollBar::updatePixmap()
         // Iterate over all visible lines, drawing them.
         for (int virtualLine = 0; virtualLine < docLineCount; virtualLine += lineIncrement) {
             int realLineNumber = m_view->textFolding().visibleLineToLine(virtualLine);
-            const Kate::TextLine kateline = m_doc->plainKateTextLine(realLineNumber);
-            if (!kateline) {
-                continue;
-            }
-            const QString lineText = kateline->text();
+            const QString lineText = m_doc->plainKateTextLine(realLineNumber);
 
             if (!simpleMode) {
                 m_doc->buffer().ensureHighlighted(realLineNumber);
             }
 
             // get normal highlighting stuff
-            const QVector<Kate::TextLineData::Attribute> &attributes = kateline->attributesList();
+            const QVector<Kate::TextLineData::Attribute> &attributes = m_doc->buffer().lineAttributes(realLineNumber);
             // get moving ranges with attribs (semantic highlighting and co.)
             const QVector<Kate::TextRange *> decorations = m_view->doc()->buffer().rangesForLine(realLineNumber, m_view, true);
 
@@ -709,11 +705,12 @@ void KateScrollBar::updatePixmap()
         // Disable this if the document is really huge,
         // since it requires querying every line.
         if (m_doc->lines() < 50000) {
+            const auto &buffer = m_doc->buffer();
             for (int lineno = 0; lineno < docLineCount; lineno++) {
                 int realLineNo = m_view->textFolding().visibleLineToLine(lineno);
-                const Kate::TextLine &line = m_doc->plainKateTextLine(realLineNo);
-                const QBrush &col = line->markedAsModified() ? modifiedLineBrush : savedLineBrush;
-                if (line->markedAsModified() || line->markedAsSavedOnDisk()) {
+                const QString line = buffer.lineText(realLineNo);
+                const QBrush &col = buffer.isLineModified(realLineNo) ? modifiedLineBrush : savedLineBrush;
+                if (buffer.isLineModified(realLineNo) || buffer.isLineSaved(realLineNo)) {
                     int pos = (lineno * pixmapLineCount) / pixmapLinesUnscaled;
                     painter.fillRect(2, pos, 3, 1, col);
                 }
@@ -2117,10 +2114,9 @@ void KateIconBorder::paintBorder(int /*x*/, int y, int /*width*/, int height)
 
             // modified line system
             if (m_view->config()->lineModification() && !m_doc->url().isEmpty()) {
-                const Kate::TextLine tl = m_doc->plainKateTextLine(realLine);
-                if (tl->markedAsModified()) {
+                if (m_doc->buffer().isLineModified(realLine)) {
                     p.fillRect(lnX, y, m_modAreaWidth, h, m_view->renderer()->config()->modifiedLineColor());
-                } else if (tl->markedAsSavedOnDisk()) {
+                } else if (m_doc->buffer().isLineSaved(realLine)) {
                     p.fillRect(lnX, y, m_modAreaWidth, h, m_view->renderer()->config()->savedLineColor());
                 }
 
@@ -2146,8 +2142,8 @@ void KateIconBorder::paintBorder(int /*x*/, int y, int /*width*/, int height)
                             anyFolded = true;
                         }
                     }
-                    const Kate::TextLine tl = m_doc->kateTextLine(realLine);
-                    if (!startingRanges.isEmpty() || tl->markedAsFoldingStart()) {
+
+                    if (!startingRanges.isEmpty() || m_doc->buffer().isLineFoldingStart(realLine)) {
                         if (anyFolded) {
                             paintTriangle(p, foldingColor, lnX, y, m_foldingAreaWidth, h, false);
                         } else {

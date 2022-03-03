@@ -198,9 +198,9 @@ bool KateBuffer::canEncode()
     }
 
     for (int i = 0; i < lines(); i++) {
-        if (!codec->canEncode(line(i)->string())) {
+        if (!codec->canEncode(lineText(i))) {
             qCDebug(LOG_KTE) << QLatin1String("ENC NAME: ") << codec->name();
-            qCDebug(LOG_KTE) << QLatin1String("STRING LINE: ") << line(i)->string();
+            qCDebug(LOG_KTE) << QLatin1String("STRING LINE: ") << lineText(i);
             qCDebug(LOG_KTE) << QLatin1String("ENC WORKING: FALSE");
 
             return false;
@@ -348,6 +348,7 @@ void KateBuffer::doHighlight(int startLine, int endLine, bool invalidate)
     bool ctxChanged = false;
     Kate::TextLine textLine = plainLine(current_line);
     Kate::TextLine nextLine;
+    bool last = false;
     // loop over the lines of the block, from startline to endline or end of block
     // if stillcontinue forces us to do so
     for (; current_line < qMin(endLine + 1, lines()); ++current_line) {
@@ -355,11 +356,12 @@ void KateBuffer::doHighlight(int startLine, int endLine, bool invalidate)
         if ((current_line + 1) < lines()) {
             nextLine = plainLine(current_line + 1);
         } else {
+            last = true;
             nextLine = Kate::TextLine(new Kate::TextLineData());
         }
 
         ctxChanged = false;
-        m_highlight->doHighlight(prevLine.data(), textLine.data(), nextLine.data(), ctxChanged, tabWidth());
+        m_highlight->doHighlight(prevLine, textLine, nextLine, ctxChanged, tabWidth());
 
 #ifdef BUFFER_DEBUGGING
         // debug stuff
@@ -406,6 +408,10 @@ void KateBuffer::doHighlight(int startLine, int endLine, bool invalidate)
         }
     }
 
+    if (last && nextLine) {
+        delete nextLine;
+    }
+
 #ifdef BUFFER_DEBUGGING
     qCDebug(LOG_KTE) << "HIGHLIGHTED END --- NEED HL, LINESTART: " << startLine << " LINEEND: " << endLine;
     qCDebug(LOG_KTE) << "HL UNTIL LINE: " << m_lineHighlighted;
@@ -438,7 +444,7 @@ KTextEditor::Range KateBuffer::computeFoldingRangeForStartLine(int startLine)
     // now: decided if indentation based folding or not!
     if (startTextLine->markedAsFoldingStartIndentation()) {
         // get our start indentation level
-        const int startIndentation = startTextLine->indentDepth(tabWidth());
+        const int startIndentation = Kate::TextLineData::indentDepth(startTextLine->text(), tabWidth());
 
         // search next line with indentation level <= our one
         int lastLine = startLine + 1;
@@ -447,12 +453,12 @@ KTextEditor::Range KateBuffer::computeFoldingRangeForStartLine(int startLine)
             Kate::TextLine textLine = plainLine(lastLine);
 
             // indentation higher than our start line? continue
-            if (startIndentation < textLine->indentDepth(tabWidth())) {
+            if (startIndentation < Kate::TextLineData::indentDepth(textLine->text(), tabWidth())) {
                 continue;
             }
 
             // empty line? continue
-            if (m_highlight->isEmptyLine(textLine.data())) {
+            if (m_highlight->isEmptyLine(textLine)) {
                 continue;
             }
 
@@ -465,7 +471,7 @@ KTextEditor::Range KateBuffer::computeFoldingRangeForStartLine(int startLine)
 
         // backtrack all empty lines, we don't want to add them to the fold!
         while (lastLine > startLine) {
-            if (m_highlight->isEmptyLine(plainLine(lastLine).data())) {
+            if (m_highlight->isEmptyLine(plainLine(lastLine))) {
                 --lastLine;
             } else {
                 break;

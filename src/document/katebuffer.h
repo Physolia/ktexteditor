@@ -31,6 +31,8 @@ class KTEXTEDITOR_EXPORT KateBuffer final : public Kate::TextBuffer
 {
     Q_OBJECT
 
+    friend class KateLineLayout;
+
 public:
     /**
      * Create an empty buffer.
@@ -148,20 +150,27 @@ public:
     bool saveFile(const QString &m_file);
 
 public:
-    /**
-     * Return line @p lineno.
-     * Highlighting of returned line might be out-dated, which may be sufficient
-     * for pure text manipulation functions, like search/replace.
-     * If you require highlighting to be up to date, call @ref ensureHighlighted
-     * prior to this method.
-     */
-    inline Kate::TextLine plainLine(int lineno)
+    //     /**
+    //      * Return line @p lineno.
+    //      * Highlighting of returned line might be out-dated, which may be sufficient
+    //      * for pure text manipulation functions, like search/replace.
+    //      * If you require highlighting to be up to date, call @ref ensureHighlighted
+    //      * prior to this method.
+    //      */
+    //     Kate::TextLine plainLine(int lineno)
+    //     {
+    //         if (lineno < 0 || lineno >= lines()) {;
+    //             return nullptr;
+    //         }
+    //
+    //         return line(lineno);
+    //     }
+    QString lineText(int lineno) const
     {
         if (lineno < 0 || lineno >= lines()) {
-            return Kate::TextLine();
+            return QString();
         }
-
-        return line(lineno);
+        return Kate::TextBuffer::lineText(lineno);
     }
 
     int lineLength(int lineno) const
@@ -171,6 +180,81 @@ public:
         }
 
         return Kate::TextBuffer::lineLength(lineno);
+    }
+
+    int attributeInLine(int lineno, int col) const
+    {
+        if (lineno < 0 || lineno >= lines()) {
+            return 0;
+        }
+        return Kate::TextBuffer::attributeInLine(lineno, col);
+    }
+
+    bool isLineModified(int line) const
+    {
+        if (line < 0 || line >= lines()) {
+            return false;
+        }
+        return Kate::TextBuffer::isLineModified(line);
+    }
+
+    void setLineModified(int line, bool modified)
+    {
+        Kate::TextBuffer::setLineModified(line, modified);
+    }
+
+    bool isLineTouched(int line) const
+    {
+        return isLineModified(line) || isLineSaved(line);
+    }
+
+    bool isLineSaved(int line) const
+    {
+        if (line < 0 || line >= lines()) {
+            return false;
+        }
+        return Kate::TextBuffer::isLineSaved(line);
+    }
+
+    void setLineSaved(int line, bool saved)
+    {
+        Kate::TextBuffer::setLineModified(line, saved);
+    }
+
+    bool isLineAutoWrapped(int line) const
+    {
+        if (line < 0 || line >= lines()) {
+            return false;
+        }
+        return Kate::TextBuffer::isLineAutoWrapped(line);
+    }
+
+    bool isLineFoldingStart(int line) const
+    {
+        if (line < 0 || line >= lines()) {
+            return false;
+        }
+        return Kate::TextBuffer::isLineFoldingStart(line);
+    }
+
+    bool isLineFoldingStartIndentation(int line) const
+    {
+        if (line < 0 || line >= lines()) {
+            return false;
+        }
+        return Kate::TextBuffer::isLineFoldingStartIndentation(line);
+    }
+
+    const QVector<Kate::TextLineData::Attribute> &lineAttributes(int line)
+    {
+        Q_ASSERT(line >= 0 && line < lines());
+        return Kate::TextBuffer::lineAttributes(line);
+    }
+
+    const std::vector<Kate::TextLineData::Folding> &lineFoldings(int line) const
+    {
+        Q_ASSERT(line >= 0 && line < lines());
+        return Kate::TextBuffer::lineFoldings(line);
     }
 
     /**

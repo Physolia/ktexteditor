@@ -6,6 +6,7 @@
 
 #include "katekeywordcompletion.h"
 
+#include "katebuffer.h"
 #include "katedocument.h"
 #include "katehighlight.h"
 #include "katetextline.h"
@@ -76,8 +77,8 @@ static bool isInWord(const KTextEditor::View *view, const KTextEditor::Cursor &p
 {
     KTextEditor::DocumentPrivate *document = static_cast<KTextEditor::DocumentPrivate *>(view->document());
     KateHighlighting *highlight = document->highlight();
-    Kate::TextLine line = document->kateTextLine(position.line());
-    return highlight->isInWord(c, line->attribute(position.column() - 1));
+    //     Kate::TextLine line = document->kateTextLine(position.line());
+    return highlight->isInWord(c, document->buffer().attributeInLine(position.line(), position.column() - 1));
 }
 
 KTextEditor::Range KateKeywordCompletionModel::completionRange(KTextEditor::View *view, const KTextEditor::Cursor &position)

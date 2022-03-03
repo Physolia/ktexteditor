@@ -32,7 +32,8 @@ class TextRange;
 class TextCursor;
 class TextBlock;
 class TextLineData;
-typedef QSharedPointer<TextLineData> TextLine;
+typedef std::unique_ptr<TextLineData> TextLinePtr;
+typedef TextLineData *TextLine;
 /**
  * Class representing a text buffer.
  * The interface is line based, internally the text will be stored in blocks of text lines.
@@ -227,13 +228,6 @@ public:
     }
 
     /**
-     * Retrieve a text line.
-     * @param line wanted line number
-     * @return text line
-     */
-    TextLine line(int line) const;
-
-    /**
      * Retrieve length for @p line
      * @param line wanted line number
      * @return length of the line
@@ -245,6 +239,78 @@ public:
 
         // get line length
         return m_blocks.at(blockIndex)->lineLength(line);
+    }
+
+    QString lineText(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->lineText(line);
+    }
+
+    int attributeInLine(int line, int col) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->attributeInLine(line, col);
+    }
+
+    bool isLineModified(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->isLineModified(line);
+    }
+
+    void setLineModified(int line, bool modified)
+    {
+        const int blockIndex = blockForLine(line);
+        m_blocks[blockIndex]->setLineModified(line, modified);
+    }
+
+    bool isLineSaved(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->isLineSaved(line);
+    }
+
+    void setLineSaved(int line, bool saved)
+    {
+        const int blockIndex = blockForLine(line);
+        m_blocks[blockIndex]->setLineModified(line, saved);
+    }
+
+    bool isLineAutoWrapped(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->isLineAutoWrapped(line);
+    }
+
+    void setLineAutoWrapped(int line, bool autoWrapped) const
+    {
+        const int blockIndex = blockForLine(line);
+        m_blocks.at(blockIndex)->setLineAutoWrapped(line, autoWrapped);
+    }
+
+    bool isLineFoldingStart(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->isLineFoldingStart(line);
+    }
+
+    bool isLineFoldingStartIndentation(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->isLineFoldingStartIndentation(line);
+    }
+
+    const QVector<Kate::TextLineData::Attribute> &lineAttributes(int line)
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->lineAttributes(line);
+    }
+
+    const std::vector<Kate::TextLineData::Folding> &lineFoldings(int line) const
+    {
+        const int blockIndex = blockForLine(line);
+        return m_blocks.at(blockIndex)->lineFoldings(line);
     }
 
     /**
@@ -561,6 +627,19 @@ public:
 
 private:
     QByteArray m_digest;
+
+protected:
+    /**
+     * Retrieve a text line.
+     * @param line wanted line number
+     * @return text line
+     */
+    TextLine line(int line) const;
+
+    TextLine plainLine(int ln) const
+    {
+        return line(ln);
+    }
 
 private:
     /**

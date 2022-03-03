@@ -20,22 +20,22 @@ TextLineData::TextLineData(const QString &text)
 
 TextLineData::~TextLineData() = default;
 
-int TextLineData::firstChar() const
+int TextLineData::firstChar(const QString &text)
 {
-    return nextNonSpaceChar(0);
+    return nextNonSpaceChar(text, 0);
 }
 
-int TextLineData::lastChar() const
+int TextLineData::lastChar(const QString &text)
 {
-    return previousNonSpaceChar(m_text.length() - 1);
+    return previousNonSpaceChar(text, text.length() - 1);
 }
 
-int TextLineData::nextNonSpaceChar(int pos) const
+int TextLineData::nextNonSpaceChar(const QString &text, int pos)
 {
     Q_ASSERT(pos >= 0);
 
-    for (int i = pos; i < m_text.length(); i++) {
-        if (!m_text[i].isSpace()) {
+    for (int i = pos; i < text.length(); i++) {
+        if (!text[i].isSpace()) {
             return i;
         }
     }
@@ -43,14 +43,14 @@ int TextLineData::nextNonSpaceChar(int pos) const
     return -1;
 }
 
-int TextLineData::previousNonSpaceChar(int pos) const
+int TextLineData::previousNonSpaceChar(const QString &text, int pos)
 {
-    if (pos >= m_text.length()) {
-        pos = m_text.length() - 1;
+    if (pos >= text.length()) {
+        pos = text.length() - 1;
     }
 
     for (int i = pos; i >= 0; i--) {
-        if (!m_text[i].isSpace()) {
+        if (!text[i].isSpace()) {
             return i;
         }
     }
@@ -58,20 +58,20 @@ int TextLineData::previousNonSpaceChar(int pos) const
     return -1;
 }
 
-QString TextLineData::leadingWhitespace() const
+QString TextLineData::leadingWhitespace(const QString &text)
 {
-    if (firstChar() < 0) {
-        return string(0, length());
+    if (firstChar(text) < 0) {
+        return text;
     }
 
-    return string(0, firstChar());
+    return text.mid(0, firstChar(text));
 }
 
-int TextLineData::indentDepth(int tabWidth) const
+int TextLineData::indentDepth(const QString &text, int tabWidth)
 {
     int d = 0;
-    const int len = m_text.length();
-    const QChar *unicode = m_text.unicode();
+    const int len = text.length();
+    const QChar *unicode = text.unicode();
 
     for (int i = 0; i < len; ++i) {
         if (unicode[i].isSpace()) {
@@ -88,20 +88,20 @@ int TextLineData::indentDepth(int tabWidth) const
     return d;
 }
 
-bool TextLineData::matchesAt(int column, const QString &match) const
+bool TextLineData::matchesAt(const QString &text, int column, const QString &match)
 {
     if (column < 0) {
         return false;
     }
 
-    const int len = m_text.length();
+    const int len = text.length();
     const int matchlen = match.length();
 
     if ((column + matchlen) > len) {
         return false;
     }
 
-    const QChar *unicode = m_text.unicode();
+    const QChar *unicode = text.unicode();
     const QChar *matchUnicode = match.unicode();
 
     for (int i = 0; i < matchlen; ++i) {
@@ -113,15 +113,15 @@ bool TextLineData::matchesAt(int column, const QString &match) const
     return true;
 }
 
-int TextLineData::toVirtualColumn(int column, int tabWidth) const
+int TextLineData::toVirtualColumn(const QString &text, int column, int tabWidth)
 {
     if (column < 0) {
         return 0;
     }
 
     int x = 0;
-    const int zmax = qMin(column, m_text.length());
-    const QChar *unicode = m_text.unicode();
+    const int zmax = qMin(column, text.length());
+    const QChar *unicode = text.unicode();
 
     for (int z = 0; z < zmax; ++z) {
         if (unicode[z] == QLatin1Char('\t')) {
@@ -134,14 +134,14 @@ int TextLineData::toVirtualColumn(int column, int tabWidth) const
     return x + column - zmax;
 }
 
-int TextLineData::fromVirtualColumn(int column, int tabWidth) const
+int TextLineData::fromVirtualColumn(const QString &text, int column, int tabWidth)
 {
     if (column < 0) {
         return 0;
     }
 
-    const int zmax = qMin(m_text.length(), column);
-    const QChar *unicode = m_text.unicode();
+    const int zmax = qMin(text.length(), column);
+    const QChar *unicode = text.unicode();
 
     int x = 0;
     int z = 0;
@@ -160,11 +160,11 @@ int TextLineData::fromVirtualColumn(int column, int tabWidth) const
     return z + qMax(column - x, 0);
 }
 
-int TextLineData::virtualLength(int tabWidth) const
+int TextLineData::virtualLength(const QString &text, int tabWidth)
 {
     int x = 0;
-    const int len = m_text.length();
-    const QChar *unicode = m_text.unicode();
+    const int len = text.length();
+    const QChar *unicode = text.unicode();
 
     for (int z = 0; z < len; ++z) {
         if (unicode[z] == QLatin1Char('\t')) {

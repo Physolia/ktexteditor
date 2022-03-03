@@ -1044,7 +1044,7 @@ bool NormalViMode::commandJoinLines()
         }
     }
 
-    const int firstNonWhitespaceOnLastLine = doc()->kateTextLine(to)->firstChar();
+    const int firstNonWhitespaceOnLastLine = Kate::TextLineData::firstChar(doc()->line(to));
     QString leftTrimmedLastLine;
     if (firstNonWhitespaceOnLastLine != -1) {
         leftTrimmedLastLine = doc()->line(to).mid(firstNonWhitespaceOnLastLine);
@@ -3904,11 +3904,7 @@ int NormalViMode::getFirstNonBlank(int line) const
         line = m_view->cursorPosition().line();
     }
 
-    // doc()->plainKateTextLine returns NULL if the line is out of bounds.
-    Kate::TextLine l = doc()->plainKateTextLine(line);
-    Q_ASSERT(l);
-
-    int c = l->firstChar();
+    int c = Kate::TextLineData::firstChar(doc()->line(line));
     return (c < 0) ? 0 : c;
 }
 

@@ -33,7 +33,8 @@ namespace Kate
 {
 class TextFolding;
 class TextLineData;
-typedef QSharedPointer<TextLineData> TextLine;
+typedef std::unique_ptr<TextLineData> TextLinePtr;
+typedef TextLineData *TextLine;
 }
 
 class KateTextLayout;

@@ -789,8 +789,8 @@ bool TextBuffer::saveBuffer(const QString &filename, KCompressionDevice &saveFil
     // do we need to add a trailing newline char?
     if (m_newLineAtEof) {
         Q_ASSERT(m_lines > 0); // see .h file
-        const Kate::TextLine lastLine = line(m_lines - 1);
-        const int firstChar = lastLine->firstChar();
+        const Kate::TextLine &lastLine = line(m_lines - 1);
+        const int firstChar = Kate::TextLineData::firstChar(lastLine->text());
         if (firstChar > -1 || lastLine->length() > 0) {
             stream << eol;
         }

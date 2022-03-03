@@ -7,6 +7,7 @@
 
 #include "katescriptdocument.h"
 
+#include "katebuffer.h"
 #include "kateconfig.h"
 #include "katedocument.h"
 #include "katehighlight.h"
@@ -122,33 +123,32 @@ bool KateScriptDocument::isOthers(const QJSValue &jscursor)
 int KateScriptDocument::firstVirtualColumn(int line)
 {
     const int tabWidth = m_document->config()->tabWidth();
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    const int firstPos = textLine ? textLine->firstChar() : -1;
-    if (!textLine || firstPos == -1) {
+    const int firstPos = Kate::TextLineData::firstChar(m_document->plainKateTextLine(line));
+    if (firstPos == -1) {
         return -1;
     }
-    return textLine->indentDepth(tabWidth);
+    return Kate::TextLineData::indentDepth(m_document->plainKateTextLine(line), tabWidth);
 }
 
 int KateScriptDocument::lastVirtualColumn(int line)
 {
     const int tabWidth = m_document->config()->tabWidth();
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    const int lastPos = textLine ? textLine->lastChar() : -1;
-    if (!textLine || lastPos == -1) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    const int lastPos = Kate::TextLineData::lastChar(textLine);
+    if (lastPos == -1) {
         return -1;
     }
-    return textLine->toVirtualColumn(lastPos, tabWidth);
+    return Kate::TextLineData::toVirtualColumn(textLine, lastPos, tabWidth);
 }
 
 int KateScriptDocument::toVirtualColumn(int line, int column)
 {
     const int tabWidth = m_document->config()->tabWidth();
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine || column < 0 || column > textLine->length()) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    if (column < 0 || column > textLine.length()) {
         return -1;
     }
-    return textLine->toVirtualColumn(column, tabWidth);
+    return Kate::TextLineData::toVirtualColumn(textLine, column, tabWidth);
 }
 
 int KateScriptDocument::toVirtualColumn(const QJSValue &jscursor)
@@ -172,11 +172,11 @@ QJSValue KateScriptDocument::toVirtualCursor(const QJSValue &jscursor)
 int KateScriptDocument::fromVirtualColumn(int line, int virtualColumn)
 {
     const int tabWidth = m_document->config()->tabWidth();
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine || virtualColumn < 0 || virtualColumn > textLine->virtualLength(tabWidth)) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    if (virtualColumn < 0 || virtualColumn > Kate::TextLineData::virtualLength(textLine, tabWidth)) {
         return -1;
     }
-    return textLine->fromVirtualColumn(virtualColumn, tabWidth);
+    return Kate::TextLineData::fromVirtualColumn(textLine, virtualColumn, tabWidth);
 }
 
 int KateScriptDocument::fromVirtualColumn(const QJSValue &jscursor)
@@ -203,22 +203,20 @@ KTextEditor::Cursor KateScriptDocument::rfindInternal(int line, int column, cons
     const int start = cursor.line();
 
     do {
-        Kate::TextLine textLine = m_document->plainKateTextLine(cursor.line());
-        if (!textLine) {
-            break;
-        }
+        const QString textLine = m_document->plainKateTextLine(cursor.line());
 
         if (cursor.line() != start) {
-            cursor.setColumn(textLine->length());
-        } else if (column >= textLine->length()) {
-            cursor.setColumn(qMax(textLine->length(), 0));
+            cursor.setColumn(textLine.length());
+        } else if (column >= textLine.length()) {
+            cursor.setColumn(qMax(textLine.length(), 0));
         }
 
         int foundAt;
-        while ((foundAt = QStringView(textLine->string()).left(cursor.column()).lastIndexOf(text)) >= 0) {
+        while ((foundAt = QStringView(textLine).left(cursor.column()).lastIndexOf(text)) >= 0) {
             bool hasStyle = true;
             if (attribute != -1) {
-                const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(textLine->attribute(foundAt));
+                auto attrib = m_document->buffer().attributeInLine(cursor.line(), foundAt);
+                const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(attrib);
                 hasStyle = (ds == attribute);
             }
 
@@ -268,10 +266,7 @@ KTextEditor::Cursor KateScriptDocument::anchorInternal(int line, int column, QCh
     }
 
     // cache line
-    Kate::TextLine currentLine = document()->plainKateTextLine(line);
-    if (!currentLine) {
-        return KTextEditor::Cursor::invalid();
-    }
+    QString currentLine = document()->plainKateTextLine(line);
 
     // Move backwards char by char and find the opening character
     int count = 1;
@@ -281,20 +276,17 @@ KTextEditor::Cursor KateScriptDocument::anchorInternal(int line, int column, QCh
         if (line != cursor.line()) {
             line = cursor.line();
             currentLine = document()->plainKateTextLine(line);
-            if (!currentLine) {
-                return KTextEditor::Cursor::invalid();
-            }
         }
 
         // get current char
-        const QChar ch = currentLine->at(cursor.column());
+        const QChar ch = currentLine.at(cursor.column());
         if (ch == lc) {
-            const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(currentLine->attribute(cursor.column()));
+            const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(m_document->buffer().attributeInLine(line, cursor.column()));
             if (_isCode(ds)) {
                 --count;
             }
         } else if (ch == rc) {
-            const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(currentLine->attribute(cursor.column()));
+            const KTextEditor::DefaultStyle ds = m_document->highlight()->defaultStyleForAttribute(m_document->buffer().attributeInLine(line, cursor.column()));
             if (_isCode(ds)) {
                 ++count;
             }
@@ -325,32 +317,24 @@ QJSValue KateScriptDocument::anchor(const QJSValue &jscursor, QChar character)
 
 bool KateScriptDocument::startsWith(int line, const QString &pattern, bool skipWhiteSpaces)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-
-    if (!textLine) {
-        return false;
-    }
+    const QString textLine = m_document->plainKateTextLine(line);
 
     if (skipWhiteSpaces) {
-        return textLine->matchesAt(textLine->firstChar(), pattern);
+        return Kate::TextLineData::matchesAt(textLine, Kate::TextLineData::firstChar(textLine), pattern);
     }
 
-    return textLine->startsWith(pattern);
+    return textLine.startsWith(pattern);
 }
 
 bool KateScriptDocument::endsWith(int line, const QString &pattern, bool skipWhiteSpaces)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-
-    if (!textLine) {
-        return false;
-    }
+    const QString textLine = m_document->plainKateTextLine(line);
 
     if (skipWhiteSpaces) {
-        return textLine->matchesAt(textLine->lastChar() - pattern.length() + 1, pattern);
+        return Kate::TextLineData::matchesAt(textLine, Kate::TextLineData::lastChar(textLine) - pattern.length() + 1, pattern);
     }
 
-    return textLine->endsWith(pattern);
+    return textLine.endsWith(pattern);
 }
 
 QString KateScriptDocument::fileName()
@@ -461,23 +445,23 @@ QString KateScriptDocument::charAt(const QJSValue &jscursor)
 
 QString KateScriptDocument::firstChar(int line)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    if (textLine.isEmpty()) {
         return QString();
     }
     // check for isNull(), as the returned character then would be "\0"
-    const QChar c = textLine->at(textLine->firstChar());
+    const QChar c = textLine.at(Kate::TextLineData::firstChar(textLine));
     return c.isNull() ? QString() : QString(c);
 }
 
 QString KateScriptDocument::lastChar(int line)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    if (textLine.isEmpty()) {
         return QString();
     }
     // check for isNull(), as the returned character then would be "\0"
-    const QChar c = textLine->at(textLine->lastChar());
+    const QChar c = textLine.at(Kate::TextLineData::lastChar(textLine));
     return c.isNull() ? QString() : QString(c);
 }
 
@@ -495,8 +479,8 @@ bool KateScriptDocument::isSpace(const QJSValue &jscursor)
 
 bool KateScriptDocument::matchesAt(int line, int column, const QString &s)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    return textLine ? textLine->matchesAt(column, s) : false;
+    const QString textLine = m_document->plainKateTextLine(line);
+    return Kate::TextLineData::matchesAt(textLine, column, s);
 }
 
 bool KateScriptDocument::matchesAt(const QJSValue &jscursor, const QString &s)
@@ -517,12 +501,12 @@ bool KateScriptDocument::clear()
 
 bool KateScriptDocument::truncate(int line, int column)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine || textLine->text().size() < column) {
+    const QString textLine = m_document->plainKateTextLine(line);
+    if (textLine.size() <= column) {
         return false;
     }
 
-    return removeText(line, column, line, textLine->text().size() - column);
+    return removeText(line, column, line, textLine.size() - column);
 }
 
 bool KateScriptDocument::truncate(const QJSValue &jscursor)
@@ -645,23 +629,20 @@ bool KateScriptDocument::isValidTextPosition(const QJSValue &cursor)
 
 int KateScriptDocument::firstColumn(int line)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    return textLine ? textLine->firstChar() : -1;
+    const QString textLine = m_document->plainKateTextLine(line);
+    return Kate::TextLineData::firstChar(textLine);
 }
 
 int KateScriptDocument::lastColumn(int line)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    return textLine ? textLine->lastChar() : -1;
+    const QString textLine = m_document->plainKateTextLine(line);
+    return Kate::TextLineData::lastChar(textLine);
 }
 
 int KateScriptDocument::prevNonSpaceColumn(int line, int column)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine) {
-        return -1;
-    }
-    return textLine->previousNonSpaceChar(column);
+    const QString textLine = m_document->plainKateTextLine(line);
+    return Kate::TextLineData::previousNonSpaceChar(textLine, column);
 }
 
 int KateScriptDocument::prevNonSpaceColumn(const QJSValue &jscursor)
@@ -672,11 +653,8 @@ int KateScriptDocument::prevNonSpaceColumn(const QJSValue &jscursor)
 
 int KateScriptDocument::nextNonSpaceColumn(int line, int column)
 {
-    Kate::TextLine textLine = m_document->plainKateTextLine(line);
-    if (!textLine) {
-        return -1;
-    }
-    return textLine->nextNonSpaceChar(column);
+    const QString textLine = m_document->plainKateTextLine(line);
+    return Kate::TextLineData::nextNonSpaceChar(textLine, column);
 }
 
 int KateScriptDocument::nextNonSpaceColumn(const QJSValue &jscursor)
@@ -689,11 +667,8 @@ int KateScriptDocument::prevNonEmptyLine(int line)
 {
     const int startLine = line;
     for (int currentLine = startLine; currentLine >= 0; --currentLine) {
-        Kate::TextLine textLine = m_document->plainKateTextLine(currentLine);
-        if (!textLine) {
-            return -1;
-        }
-        if (textLine->firstChar() != -1) {
+        const QString textLine = m_document->plainKateTextLine(currentLine);
+        if (Kate::TextLineData::firstChar(textLine) != -1) {
             return currentLine;
         }
     }
@@ -704,11 +679,8 @@ int KateScriptDocument::nextNonEmptyLine(int line)
 {
     const int startLine = line;
     for (int currentLine = startLine; currentLine < m_document->lines(); ++currentLine) {
-        Kate::TextLine textLine = m_document->plainKateTextLine(currentLine);
-        if (!textLine) {
-            return -1;
-        }
-        if (textLine->firstChar() != -1) {
+        const QString textLine = m_document->plainKateTextLine(currentLine);
+        if (Kate::TextLineData::firstChar(textLine) != -1) {
             return currentLine;
         }
     }
@@ -757,11 +729,8 @@ QJSValue KateScriptDocument::documentEnd()
 
 int KateScriptDocument::attribute(int line, int column)
 {
-    Kate::TextLine textLine = m_document->kateTextLine(line);
-    if (!textLine) {
-        return 0;
-    }
-    return textLine->attribute(column);
+    const QString textLine = m_document->kateTextLine(line);
+    return m_document->buffer().attributeInLine(line, column);
 }
 
 int KateScriptDocument::attribute(const QJSValue &jscursor)
@@ -783,7 +752,7 @@ bool KateScriptDocument::isAttribute(const QJSValue &jscursor, int attr)
 
 QString KateScriptDocument::attributeName(int line, int column)
 {
-    return m_document->highlight()->nameForAttrib(document()->plainKateTextLine(line)->attribute(column));
+    return m_document->highlight()->nameForAttrib(document()->buffer().attributeInLine(line, column));
 }
 
 QString KateScriptDocument::attributeName(const QJSValue &jscursor)

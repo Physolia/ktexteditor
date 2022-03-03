@@ -6,6 +6,7 @@
 */
 
 #include "katelinelayout.h"
+#include "katebuffer.h"
 #include "katetextfolding.h"
 #include "katetextlayout.h"
 
@@ -47,7 +48,14 @@ bool KateLineLayout::includesCursor(const KTextEditor::Cursor realCursor) const
 const Kate::TextLine &KateLineLayout::textLine(bool reloadForce) const
 {
     if (reloadForce || !m_textLine) {
-        m_textLine = usePlainTextLine() ? m_renderer.doc()->plainKateTextLine(line()) : m_renderer.doc()->kateTextLine(line());
+        if (usePlainTextLine()) {
+            m_textLine = m_renderer.doc()->buffer().line(line());
+        } else {
+            m_renderer.doc()->buffer().ensureHighlighted(line());
+            m_textLine = m_renderer.doc()->buffer().line(line());
+        }
+
+        //         m_textLine = usePlainTextLine() ? m_renderer.doc()->plainKateTextLine(line()) : m_renderer.doc()->kateTextLine(line());
     }
 
     Q_ASSERT(m_textLine);

@@ -45,12 +45,12 @@ TextLine TextBlock::line(int line) const
     Q_ASSERT(line >= startLine());
 
     // get text line, at will bail out on out-of-range
-    return m_lines.at(line - startLine());
+    return m_lines.at(line - startLine()).get();
 }
 
 void TextBlock::appendLine(const QString &textOfLine)
 {
-    m_lines.push_back(TextLine::create(textOfLine));
+    m_lines.push_back(std::make_unique<TextLineData>(textOfLine));
 }
 
 void TextBlock::clearLines()
@@ -84,7 +84,7 @@ void TextBlock::wrapLine(const KTextEditor::Cursor position, int fixStartLinesSt
     Q_ASSERT(position.column() <= text.size());
 
     // create new line and insert it
-    m_lines.insert(m_lines.begin() + line + 1, TextLine(new TextLineData()));
+    m_lines.insert(m_lines.begin() + line + 1, TextLinePtr(new TextLineData()));
 
     // cases for modification:
     // 1. line is wrapped in the middle
@@ -190,11 +190,14 @@ void TextBlock::unwrapLine(int line, TextBlock *previousBlock, int fixStartLines
         Q_ASSERT(previousBlock->lines() > 0);
 
         // move last line of previous block to this one, might result in empty block
-        TextLine oldFirst = m_lines.at(0);
+        const TextLinePtr &oldFirst = m_lines.at(0);
         int lastLineOfPreviousBlock = previousBlock->lines() - 1;
-        TextLine newFirst = previousBlock->m_lines.back();
-        m_lines[0] = newFirst;
-        previousBlock->m_lines.erase(previousBlock->m_lines.begin() + (previousBlock->lines() - 1));
+        {
+            TextLinePtr &newFirst = previousBlock->m_lines.back();
+            m_lines[0] = std::move(newFirst);
+            previousBlock->m_lines.erase(previousBlock->m_lines.begin() + (previousBlock->lines() - 1));
+        }
+        const TextLine newFirst = m_lines[0].get();
 
         const int oldSizeOfPreviousLine = newFirst->text().size();
         if (oldFirst->length() > 0) {
@@ -506,7 +509,7 @@ TextBlock *TextBlock::splitBlock(int fromLine)
     // move lines
     newBlock->m_lines.reserve(linesOfNewBlock);
     for (size_t i = fromLine; i < m_lines.size(); ++i) {
-        newBlock->m_lines.push_back(m_lines.at(i));
+        newBlock->m_lines.push_back(std::move(m_lines[i]));
     }
     m_lines.resize(fromLine);
 
@@ -557,7 +560,7 @@ void TextBlock::mergeBlock(TextBlock *targetBlock)
     // move lines
     targetBlock->m_lines.reserve(targetBlock->lines() + lines());
     for (size_t i = 0; i < m_lines.size(); ++i) {
-        targetBlock->m_lines.push_back(m_lines.at(i));
+        targetBlock->m_lines.push_back(std::move(m_lines[i]));
     }
     m_lines.clear();
 

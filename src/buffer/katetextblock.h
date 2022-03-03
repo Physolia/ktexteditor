@@ -30,7 +30,8 @@ class TextBuffer;
 class TextCursor;
 class TextRange;
 class TextLineData;
-typedef QSharedPointer<TextLineData> TextLine;
+typedef std::unique_ptr<TextLineData> TextLinePtr;
+typedef TextLineData *TextLine;
 
 /**
  * Class representing a text block.
@@ -83,6 +84,78 @@ public:
     {
         Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
         return m_lines[line - startLine()]->length();
+    }
+
+    QString lineText(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->text();
+    }
+
+    int attributeInLine(int line, int col)
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->attribute(col);
+    }
+
+    bool isLineModified(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->markedAsModified();
+    }
+
+    void setLineModified(int line, bool mod)
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        m_lines[line - startLine()]->markAsModified(mod);
+    }
+
+    bool isLineSaved(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->markedAsSavedOnDisk();
+    }
+
+    void setLineSaved(int line, bool saved)
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        m_lines[line - startLine()]->markAsSavedOnDisk(saved);
+    }
+
+    bool isLineAutoWrapped(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->isAutoWrapped();
+    }
+
+    void setLineAutoWrapped(int line, bool autoWrapped)
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        m_lines[line - startLine()]->setAutoWrapped(autoWrapped);
+    }
+
+    bool isLineFoldingStart(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->markedAsFoldingStart();
+    }
+
+    bool isLineFoldingStartIndentation(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->markedAsFoldingStartIndentation();
+    }
+
+    const QVector<Kate::TextLineData::Attribute> &lineAttributes(int line)
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->attributesList();
+    }
+
+    const std::vector<Kate::TextLineData::Folding> &lineFoldings(int line) const
+    {
+        Q_ASSERT(line >= startLine() && (line - startLine()) < lines());
+        return m_lines[line - startLine()]->foldings();
     }
 
     /**
@@ -255,7 +328,7 @@ private:
      * Lines contained in this buffer. These are shared pointers.
      * We need no sharing, use STL.
      */
-    std::vector<Kate::TextLine> m_lines;
+    std::vector<Kate::TextLinePtr> m_lines;
 
     /**
      * Startline of this block

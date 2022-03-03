@@ -76,7 +76,7 @@ void KateTextBufferTest::insertRemoveTextTest()
     QVERIFY(buffer.text() == QLatin1String("\n"));
 
     // remember second line
-    Kate::TextLine second = buffer.line(1);
+    //     Kate::TextLine second = buffer.line(1);
 
     // unwrap second line
     buffer.startEditing();

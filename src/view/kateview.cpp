@@ -84,9 +84,8 @@ namespace
 {
 bool hasCommentInFirstLine(KTextEditor::DocumentPrivate *doc)
 {
-    const Kate::TextLine &line = doc->kateTextLine(0);
-    Q_ASSERT(line);
-    return doc->isComment(0, line->firstChar());
+    const QString line = doc->kateTextLine(0);
+    return doc->isComment(0, Kate::TextLineData::firstChar(line));
 }
 
 }
@@ -1282,10 +1281,9 @@ KTextEditor::Range KTextEditor::ViewPrivate::foldLine(int line)
 
     // Ensure not to fold the end marker to avoid a deceptive look, but only on token based folding
     // ensure we don't compute an invalid line by moving outside of the foldingRange range by checking onSingleLine(), see bug 417890
-    Kate::TextLine startTextLine = doc()->buffer().plainLine(line);
-    if (!startTextLine->markedAsFoldingStartIndentation() && !foldingRange.onSingleLine()) {
+    if (!doc()->buffer().isLineFoldingStartIndentation(line) && !foldingRange.onSingleLine()) {
         const int adjustedLine = foldingRange.end().line() - 1;
-        foldingRange.setEnd(KTextEditor::Cursor(adjustedLine, doc()->buffer().plainLine(adjustedLine)->length()));
+        foldingRange.setEnd(KTextEditor::Cursor(adjustedLine, doc()->buffer().lineLength(adjustedLine)));
     }
 
     // Don't try to fold a single line, which can happens due to adjustment above
@@ -1578,13 +1576,7 @@ void KTextEditor::ViewPrivate::slotUpdateUndo()
 
 bool KTextEditor::ViewPrivate::setCursorPositionInternal(const KTextEditor::Cursor position, uint tabwidth, bool calledExternally)
 {
-    Kate::TextLine l = doc()->kateTextLine(position.line());
-
-    if (!l) {
-        return false;
-    }
-
-    const QString line_str = l->text();
+    const QString line_str = doc()->kateTextLine(position.line());
 
     int x = 0;
     int z = 0;
@@ -2892,18 +2884,18 @@ void KTextEditor::ViewPrivate::smartNewline()
 {
     const KTextEditor::Cursor cursor = cursorPosition();
     const int ln = cursor.line();
-    Kate::TextLine line = doc()->kateTextLine(ln);
-    int col = qMin(cursor.column(), line->firstChar());
+    const QString line = doc()->kateTextLine(ln);
+    int col = qMin(cursor.column(), Kate::TextLineData::firstChar(line));
     if (col != -1) {
-        while (line->length() > col && !(line->at(col).isLetterOrNumber() || line->at(col) == QLatin1Char('_')) && col < cursor.column()) {
+        while (line.length() > col && !(line.at(col).isLetterOrNumber() || line.at(col) == QLatin1Char('_')) && col < cursor.column()) {
             ++col;
         }
     } else {
-        col = line->length(); // stay indented
+        col = line.length(); // stay indented
     }
     doc()->editStart();
     doc()->editWrapLine(ln, cursor.column());
-    doc()->insertText(KTextEditor::Cursor(ln + 1, 0), line->string(0, col));
+    doc()->insertText(KTextEditor::Cursor(ln + 1, 0), line.mid(0, col));
     doc()->editEnd();
 
     m_viewInternal->updateView();
@@ -4024,12 +4016,8 @@ QList<KTextEditor::AttributeBlock> KTextEditor::ViewPrivate::lineAttributes(int 
         return attribs;
     }
 
-    Kate::TextLine kateLine = doc()->kateTextLine(line);
-    if (!kateLine) {
-        return attribs;
-    }
-
-    const QVector<Kate::TextLineData::Attribute> &intAttrs = kateLine->attributesList();
+    const QVector<Kate::TextLineData::Attribute> &intAttrs = doc()->buffer().lineAttributes(line);
+    ;
     for (int i = 0; i < intAttrs.size(); ++i) {
         if (intAttrs[i].length > 0 && intAttrs[i].attributeValue > 0) {
             attribs << KTextEditor::AttributeBlock(intAttrs.at(i).offset, intAttrs.at(i).length, renderer()->attribute(intAttrs.at(i).attributeValue));

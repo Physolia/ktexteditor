@@ -148,19 +148,12 @@ QString KateAutoIndent::tabString(int length, int align) const
 
 bool KateAutoIndent::doIndent(int line, int indentDepth, int align)
 {
-    Kate::TextLine textline = doc->plainKateTextLine(line);
-
-    // textline not found, cu
-    if (!textline) {
-        return false;
-    }
-
     // sanity check
     if (indentDepth < 0) {
         indentDepth = 0;
     }
 
-    const QString oldIndentation = textline->leadingWhitespace();
+    const QString oldIndentation = Kate::TextLineData::leadingWhitespace(doc->plainKateTextLine(line));
 
     // Preserve existing "tabs then spaces" alignment if and only if:
     //  - no alignment was passed to doIndent and
@@ -197,10 +190,8 @@ bool KateAutoIndent::doIndent(int line, int indentDepth, int align)
 
 bool KateAutoIndent::doIndentRelative(int line, int change)
 {
-    Kate::TextLine textline = doc->plainKateTextLine(line);
-
     // get indent width of current line
-    int indentDepth = textline->indentDepth(tabWidth);
+    int indentDepth = Kate::TextLineData::indentDepth(doc->plainKateTextLine(line), tabWidth);
     int extraSpaces = indentDepth % indentWidth;
 
     // add change
@@ -234,21 +225,16 @@ void KateAutoIndent::keepIndent(int line)
         }
         --nonEmptyLine;
     }
-    Kate::TextLine prevTextLine = doc->plainKateTextLine(nonEmptyLine);
-    Kate::TextLine textLine = doc->plainKateTextLine(line);
+    const QString prevTextLine = doc->plainKateTextLine(nonEmptyLine);
+    const QString textLine = doc->plainKateTextLine(line);
 
-    // textline not found, cu
-    if (!prevTextLine || !textLine) {
-        return;
-    }
-
-    const QString previousWhitespace = prevTextLine->leadingWhitespace();
+    const QString previousWhitespace = Kate::TextLineData::leadingWhitespace(prevTextLine);
 
     // remove leading whitespace, then insert the leading indentation
     doc->editStart();
 
     if (!keepExtra) {
-        const QString currentWhitespace = textLine->leadingWhitespace();
+        const QString currentWhitespace = Kate::TextLineData::leadingWhitespace(textLine);
         doc->editRemoveText(line, 0, currentWhitespace.length());
     }
 

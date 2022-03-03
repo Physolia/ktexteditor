@@ -805,12 +805,8 @@ KTextEditor::Attribute::Ptr KateViewInternal::attributeAt(const KTextEditor::Cur
 {
     KTextEditor::Attribute::Ptr attrib(new KTextEditor::Attribute());
 
-    Kate::TextLine kateLine = doc()->kateTextLine(position.line());
-    if (!kateLine) {
-        return attrib;
-    }
-
-    *attrib = *m_view->renderer()->attribute(kateLine->attribute(position.column()));
+    const auto attribute = doc()->buffer().attributeInLine(position.line(), position.column());
+    *attrib = *m_view->renderer()->attribute(attribute);
 
     return attrib;
 }
@@ -1563,14 +1559,8 @@ void KateViewInternal::home(bool sel)
         return;
     }
 
-    Kate::TextLine l = doc()->kateTextLine(m_cursor.line());
-
-    if (!l) {
-        return;
-    }
-
     KTextEditor::Cursor c = m_cursor;
-    int lc = l->firstChar();
+    int lc = Kate::TextLineData::firstChar(doc()->line(m_cursor.line()));
 
     if (lc < 0 || c.column() == lc) {
         c.setColumn(0);
@@ -1601,16 +1591,11 @@ void KateViewInternal::end(bool sel)
         return;
     }
 
-    Kate::TextLine l = doc()->kateTextLine(m_cursor.line());
-
-    if (!l) {
-        return;
-    }
-
     // "Smart End", as requested in bugs #78258 and #106970
     if (m_cursor.column() == doc()->lineLength(m_cursor.line())) {
         KTextEditor::Cursor c = m_cursor;
-        c.setColumn(l->lastChar() + 1);
+        const int lastChar = Kate::TextLineData::lastChar(doc()->line(m_cursor.line()));
+        c.setColumn(lastChar + 1);
         updateSelection(c, sel);
         updateCursor(c, true);
     } else {
@@ -1773,7 +1758,7 @@ int KateViewInternal::lineMaxCursorX(const KateTextLayout &range)
     int maxX = range.endX();
 
     if (maxX && range.wrap()) {
-        QChar lastCharInLine = doc()->kateTextLine(range.line())->at(range.endCol() - 1);
+        QChar lastCharInLine = doc()->line(range.line()).at(range.endCol() - 1);
         maxX -= renderer()->currentFontMetrics().horizontalAdvance(lastCharInLine);
     }
 
@@ -2103,12 +2088,12 @@ void KateViewInternal::updateSelection(const KTextEditor::Cursor _newCursor, boo
                 if (newCursor > m_selectionCached.start()) {
                     m_selectAnchor = m_selectionCached.start();
 
-                    Kate::TextLine l = doc()->kateTextLine(newCursor.line());
+                    const QString l = doc()->kateTextLine(newCursor.line());
 
                     c = newCursor.column();
-                    if (c > 0 && doc()->highlight()->isInWord(l->at(c - 1))) {
-                        for (; c < l->length(); c++) {
-                            if (!doc()->highlight()->isInWord(l->at(c))) {
+                    if (c > 0 && doc()->highlight()->isInWord(l.at(c - 1))) {
+                        for (; c < l.length(); c++) {
+                            if (!doc()->highlight()->isInWord(l.at(c))) {
                                 break;
                             }
                         }
@@ -2118,13 +2103,13 @@ void KateViewInternal::updateSelection(const KTextEditor::Cursor _newCursor, boo
                 } else if (newCursor < m_selectionCached.start()) {
                     m_selectAnchor = m_selectionCached.end();
 
-                    Kate::TextLine l = doc()->kateTextLine(newCursor.line());
+                    const QString l = doc()->kateTextLine(newCursor.line());
 
                     c = newCursor.column();
-                    if (c > 0 && c < doc()->lineLength(newCursor.line()) && doc()->highlight()->isInWord(l->at(c))
-                        && doc()->highlight()->isInWord(l->at(c - 1))) {
+                    if (c > 0 && c < doc()->lineLength(newCursor.line()) && doc()->highlight()->isInWord(l.at(c))
+                        && doc()->highlight()->isInWord(l.at(c - 1))) {
                         for (c -= 2; c >= 0; c--) {
-                            if (!doc()->highlight()->isInWord(l->at(c))) {
+                            if (!doc()->highlight()->isInWord(l.at(c))) {
                                 break;
                             }
                         }
@@ -2231,7 +2216,7 @@ KTextEditor::Range KateViewInternal::findMatchingFoldingMarker(const KTextEditor
     const int direction = !(value < 0) ? 1 : -1;
     int foldCounter = 0;
     int lineCounter = 0;
-    auto &foldMarkers = m_view->doc()->buffer().plainLine(currentCursorPos.line())->foldings();
+    auto &foldMarkers = m_view->doc()->buffer().lineFoldings(currentCursorPos.line());
 
     // searching a end folding marker? go left to right
     // otherwise, go right to left
@@ -2257,7 +2242,7 @@ KTextEditor::Range KateViewInternal::findMatchingFoldingMarker(const KTextEditor
     int currentLine = currentCursorPos.line() + direction;
     for (; currentLine >= 0 && currentLine < m_view->doc()->lines() && lineCounter < maxLines; currentLine += direction) {
         // update line attributes
-        auto &foldMarkers = m_view->doc()->buffer().plainLine(currentLine)->foldings();
+        auto &foldMarkers = m_view->doc()->buffer().lineFoldings(currentLine);
         i = direction == 1 ? 0 : (long)foldMarkers.size() - 1;
 
         // iterate through the markers
@@ -2283,7 +2268,7 @@ KTextEditor::Range KateViewInternal::findMatchingFoldingMarker(const KTextEditor
 
 void KateViewInternal::updateFoldingMarkersHighlighting()
 {
-    auto &foldings = m_view->doc()->buffer().plainLine(m_cursor.line())->foldings();
+    auto &foldings = m_view->doc()->buffer().lineFoldings(m_cursor.line());
 
     for (unsigned long i = 0; i < foldings.size(); i++) {
         // 1 -> left to right, the current folding is start type
@@ -2805,8 +2790,8 @@ void KateViewInternal::keyPressEvent(QKeyEvent *e)
                     // if the cursor is at or before the first non-space character
                     // or on an empty line,
                     // Tab indents, otherwise it inserts a tab character.
-                    Kate::TextLine line = doc()->kateTextLine(m_cursor.line());
-                    int first = line->firstChar();
+                    const QString line = doc()->line(m_cursor.line());
+                    int first = Kate::TextLineData::firstChar(line);
                     if (first < 0 || m_cursor.column() <= first) {
                         tabHandling = KateDocumentConfig::tabIndents;
                     } else {
@@ -3046,21 +3031,21 @@ void KateViewInternal::mouseDoubleClickEvent(QMouseEvent *e)
             // Now select the word under the select anchor
             int cs;
             int ce;
-            Kate::TextLine l = doc()->kateTextLine(m_selectAnchor.line());
+            const QString l = doc()->kateTextLine(m_selectAnchor.line());
 
             ce = m_selectAnchor.column();
-            if (ce > 0 && doc()->highlight()->isInWord(l->at(ce))) {
-                for (; ce < l->length(); ce++) {
-                    if (!doc()->highlight()->isInWord(l->at(ce))) {
+            if (ce > 0 && doc()->highlight()->isInWord(l.at(ce))) {
+                for (; ce < l.length(); ce++) {
+                    if (!doc()->highlight()->isInWord(l.at(ce))) {
                         break;
                     }
                 }
             }
 
             cs = m_selectAnchor.column() - 1;
-            if (cs < doc()->lineLength(m_selectAnchor.line()) && doc()->highlight()->isInWord(l->at(cs))) {
+            if (cs < doc()->lineLength(m_selectAnchor.line()) && doc()->highlight()->isInWord(l.at(cs))) {
                 for (cs--; cs >= 0; cs--) {
-                    if (!doc()->highlight()->isInWord(l->at(cs))) {
+                    if (!doc()->highlight()->isInWord(l.at(cs))) {
                         break;
                     }
                 }
@@ -4198,11 +4183,7 @@ QVariant KateViewInternal::inputMethodQuery(Qt::InputMethodQuery query) const
         }
 
     case Qt::ImSurroundingText:
-        if (Kate::TextLine l = doc()->kateTextLine(m_cursor.line())) {
-            return l->string();
-        } else {
-            return QString();
-        }
+        return doc()->line(m_cursor.line());
 
     case Qt::ImCurrentSelection:
         if (view()->selection()) {
@@ -4380,7 +4361,8 @@ void KateViewInternal::showBracketMatchPreview()
     lineLayout->setLine(previewLine, -1);
 
     // If the opening bracket is on its own line, start preview at the line above it instead (where the context is likely to be)
-    const int col = lineLayout->textLine()->firstChar();
+    const auto textLine = lineLayout->textLine();
+    const int col = Kate::TextLineData::firstChar(textLine->text());
     if (previewLine > 0 && (col == -1 || col == openBracketCursor.column())) {
         lineLayout->setLine(previewLine - 1, lineLayout->virtualLine() - 1);
     }

@@ -13,6 +13,7 @@
 // BEGIN INCLUDES
 #include "katehighlight.h"
 
+#include "katebuffer.h"
 #include "katedocument.h"
 #include "katesyntaxmanager.h"
 // END
@@ -161,7 +162,7 @@ void KateHighlighting::doHighlight(const Kate::TextLineData *prevLine,
     if (m_foldingIndentationSensitive && (tabWidth > 0) && !textLine->markedAsFoldingStartAttribute()) {
         // compute if we increase indentation in next line
         if (endOfLineState.indentationBasedFoldingEnabled() && !isEmptyLine(textLine) && !isEmptyLine(nextLine)
-            && (textLine->indentDepth(tabWidth) < nextLine->indentDepth(tabWidth))) {
+            && (textLine->indentDepth(textLine->text(), tabWidth) < nextLine->indentDepth(nextLine->text(), tabWidth))) {
             textLine->markAsFoldingStartIndentation();
         }
     }
@@ -413,19 +414,14 @@ int KateHighlighting::attributeForLocation(KTextEditor::DocumentPrivate *doc, co
     }
 
     // get highlighted line
-    Kate::TextLine tl = doc->kateTextLine(cursor.line());
-
-    // make sure the textline is a valid pointer
-    if (!tl) {
-        return 0;
-    }
+    const QString tl = doc->kateTextLine(cursor.line());
 
     // either get char attribute or attribute of context still active at end of line
-    if (cursor.column() < tl->length()) {
-        return sanitizeFormatIndex(tl->attribute(cursor.column()));
-    } else if (cursor.column() >= tl->length()) {
-        if (!tl->attributesList().isEmpty()) {
-            return sanitizeFormatIndex(tl->attributesList().back().attributeValue);
+    if (cursor.column() < tl.length()) {
+        return sanitizeFormatIndex(doc->buffer().attributeInLine(cursor.line(), cursor.column()));
+    } else if (cursor.column() >= tl.length()) {
+        if (!doc->buffer().lineAttributes(cursor.line()).isEmpty()) {
+            return sanitizeFormatIndex(doc->buffer().lineAttributes(cursor.line()).back().attributeValue);
         }
     }
     return 0;

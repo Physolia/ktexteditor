@@ -7,6 +7,7 @@
     SPDX-License-Identifier: LGPL-2.0-or-later
 */
 
+#include "katebuffer.h"
 #include "kateconfig.h"
 #include "katedocument.h"
 #include "kateglobal.h"
@@ -573,11 +574,14 @@ Range ModeBase::findSurroundingQuotes(const QChar &c, bool inner) const
 
     // If cursor on the quote we should choose the best direction.
     if (line.at(cursor.column()) == c) {
-        int attribute = m_view->doc()->kateTextLine(cursor.line())->attribute(cursor.column());
+        auto attrib = [this](int line, int col) {
+            return m_view->doc()->buffer().attributeInLine(line, col);
+        };
+
+        int attribute = attrib(cursor.line(), cursor.column());
 
         //  If at the beginning of the line - then we might search the end.
-        if (doc()->kateTextLine(cursor.line())->attribute(cursor.column() + 1) == attribute
-            && doc()->kateTextLine(cursor.line())->attribute(cursor.column() - 1) != attribute) {
+        if (attrib(cursor.line(), cursor.column() + 1) == attribute && attrib(cursor.line(), cursor.column() - 1) != attribute) {
             r.startColumn = cursor.column();
             r.endColumn = line.indexOf(c, cursor.column() + 1);
 
@@ -585,8 +589,7 @@ Range ModeBase::findSurroundingQuotes(const QChar &c, bool inner) const
         }
 
         //  If at the end of the line - then we might search the beginning.
-        if (doc()->kateTextLine(cursor.line())->attribute(cursor.column() + 1) != attribute
-            && doc()->kateTextLine(cursor.line())->attribute(cursor.column() - 1) == attribute) {
+        if (attrib(cursor.line(), cursor.column() + 1) != attribute && attrib(cursor.line(), cursor.column() - 1) == attribute) {
             r.startColumn = line.lastIndexOf(c, cursor.column() - 1);
             r.endColumn = cursor.column();
 
@@ -847,8 +850,8 @@ Range ModeBase::goLineUpDown(int lines)
         r.endLine = doc()->lines() - 1;
     }
 
-    Kate::TextLine startLine = doc()->plainKateTextLine(c.line());
-    Kate::TextLine endLine = doc()->plainKateTextLine(r.endLine);
+    const QString startLine = doc()->plainKateTextLine(c.line());
+    const QString endLine = doc()->plainKateTextLine(r.endLine);
 
     int endLineLen = doc()->lineLength(r.endLine) - 1;
 
@@ -856,16 +859,16 @@ Range ModeBase::goLineUpDown(int lines)
         endLineLen = 0;
     }
 
-    int endLineLenVirt = endLine->toVirtualColumn(endLineLen, tabstop);
-    int virtColumnStart = startLine->toVirtualColumn(c.column(), tabstop);
+    int endLineLenVirt = Kate::TextLineData::toVirtualColumn(endLine, endLineLen, tabstop);
+    int virtColumnStart = Kate::TextLineData::toVirtualColumn(startLine, c.column(), tabstop);
 
     // if sticky column isn't set, set end column and set sticky column to its virtual column
     if (m_stickyColumn == -1) {
-        r.endColumn = endLine->fromVirtualColumn(virtColumnStart, tabstop);
+        r.endColumn = Kate::TextLineData::fromVirtualColumn(endLine, virtColumnStart, tabstop);
         m_stickyColumn = virtColumnStart;
     } else {
         // sticky is set - set end column to its value
-        r.endColumn = endLine->fromVirtualColumn(m_stickyColumn, tabstop);
+        r.endColumn = Kate::TextLineData::fromVirtualColumn(endLine, m_stickyColumn, tabstop);
     }
 
     // make sure end column won't be after the last column of a line
@@ -943,16 +946,18 @@ Range ModeBase::goVisualLineUpDown(int lines)
         // Compute new sticky column. It is a *visual* sticky column.
         int startVisualLine = cache->viewLine(m_view->cursorPosition());
         int startRealLine = m_view->cursorPosition().line();
-        const Kate::TextLine startLine = doc()->plainKateTextLine(c.line());
+        const QString startLine = doc()->plainKateTextLine(c.line());
         // Adjust for the fact that if the portion of the line before wrapping is indented,
         // the continuations are also "invisibly" (i.e. without any spaces in the text itself) indented.
         const bool isWrappedContinuation = (cache->textLayout(startRealLine, startVisualLine).lineLayout().lineNumber() != 0);
-        const int numInvisibleIndentChars =
-            isWrappedContinuation ? startLine->toVirtualColumn(cache->line(startRealLine)->textLine()->nextNonSpaceChar(0), tabstop) : 0;
+        const auto startRealKateTextLine = cache->line(startRealLine)->textLine();
+        const int numInvisibleIndentChars = isWrappedContinuation
+            ? Kate::TextLineData::toVirtualColumn(startLine, Kate::TextLineData::nextNonSpaceChar(startRealKateTextLine->text(), 0), tabstop)
+            : 0;
 
         const int realLineStartColumn = cache->textLayout(startRealLine, startVisualLine).startCol();
-        const int lineStartVirtualColumn = startLine->toVirtualColumn(realLineStartColumn, tabstop);
-        const int visualColumnNoInvisibleIndent = startLine->toVirtualColumn(c.column(), tabstop) - lineStartVirtualColumn;
+        const int lineStartVirtualColumn = Kate::TextLineData::toVirtualColumn(startLine, realLineStartColumn, tabstop);
+        const int visualColumnNoInvisibleIndent = Kate::TextLineData::toVirtualColumn(startLine, c.column(), tabstop) - lineStartVirtualColumn;
         m_stickyColumn = visualColumnNoInvisibleIndent + numInvisibleIndentChars;
         Q_ASSERT(m_stickyColumn >= 0);
     }
@@ -960,23 +965,25 @@ Range ModeBase::goVisualLineUpDown(int lines)
     // The "real" (non-virtual) beginning of the current "line", which might be a wrapped continuation of a
     // "real" line.
     const int realLineStartColumn = cache->textLayout(finishRealLine, finishVisualLine).startCol();
-    const Kate::TextLine endLine = doc()->plainKateTextLine(r.endLine);
+    const QString endLine = doc()->plainKateTextLine(r.endLine);
     // Adjust for the fact that if the portion of the line before wrapping is indented,
     // the continuations are also "invisibly" (i.e. without any spaces in the text itself) indented.
     const bool isWrappedContinuation = (cache->textLayout(finishRealLine, finishVisualLine).lineLayout().lineNumber() != 0);
-    const int numInvisibleIndentChars =
-        isWrappedContinuation ? endLine->toVirtualColumn(cache->line(finishRealLine)->textLine()->nextNonSpaceChar(0), tabstop) : 0;
+    const auto finishRealKateTextLine = cache->line(finishRealLine)->textLine();
+    const int numInvisibleIndentChars = isWrappedContinuation
+        ? Kate::TextLineData::toVirtualColumn(endLine, Kate::TextLineData::nextNonSpaceChar(finishRealKateTextLine->text(), 0), tabstop)
+        : 0;
     if (m_stickyColumn == (unsigned int)KateVi::EOL) {
         const int visualEndColumn = cache->textLayout(finishRealLine, finishVisualLine).lineLayout().textLength() - 1;
-        r.endColumn = endLine->fromVirtualColumn(visualEndColumn + realLineStartColumn - numInvisibleIndentChars, tabstop);
+        r.endColumn = Kate::TextLineData::fromVirtualColumn(endLine, visualEndColumn + realLineStartColumn - numInvisibleIndentChars, tabstop);
     } else {
         // Algorithm: find the "real" column corresponding to the start of the line.  Offset from that
         // until the "visual" column is equal to the "visual" sticky column.
         int realOffsetToVisualStickyColumn = 0;
-        const int lineStartVirtualColumn = endLine->toVirtualColumn(realLineStartColumn, tabstop);
+        const int lineStartVirtualColumn = Kate::TextLineData::toVirtualColumn(endLine, realLineStartColumn, tabstop);
         while (true) {
-            const int visualColumn =
-                endLine->toVirtualColumn(realLineStartColumn + realOffsetToVisualStickyColumn, tabstop) - lineStartVirtualColumn + numInvisibleIndentChars;
+            const int visualColumn = Kate::TextLineData::toVirtualColumn(endLine, realLineStartColumn + realOffsetToVisualStickyColumn, tabstop)
+                - lineStartVirtualColumn + numInvisibleIndentChars;
             if (visualColumn >= m_stickyColumn) {
                 break;
             }
