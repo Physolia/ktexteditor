@@ -3090,6 +3090,15 @@ void KTextEditor::ViewPrivate::addSecondaryCursorDown()
     clearSecondarySelections();
     int x = renderer()->cursorToX(m_viewInternal->currentLayout(cursorPosition()), cursorPosition().column());
     auto next = renderer()->xToCursor(nextRange, x, !wrapCursor());
+
+    int diff = cursorPosition().column() - next.column();
+    if (diff > 0) {
+        QString spaces = QStringLiteral(" ").repeated(diff);
+        if (doc()->insertText(next, spaces)) {
+            next.setColumn(cursorPosition().column());
+        }
+    }
+
     addSecondaryCursorAt(next);
 }
 
@@ -3112,6 +3121,14 @@ void KTextEditor::ViewPrivate::addSecondaryCursorUp()
     clearSecondarySelections();
     int x = renderer()->cursorToX(m_viewInternal->currentLayout(cursorPosition()), cursorPosition().column());
     auto next = renderer()->xToCursor(nextRange, x, !wrapCursor());
+
+    int diff = cursorPosition().column() - next.column();
+    if (diff > 0) {
+        QString spaces = QStringLiteral(" ").repeated(diff);
+        if (doc()->insertText(next, spaces)) {
+            next.setColumn(cursorPosition().column());
+        }
+    }
     addSecondaryCursorAt(next);
 }
 
