@@ -3351,6 +3351,8 @@ void KateViewInternal::contextMenuEvent(QContextMenuEvent *e)
     // show it
     if (view()->contextMenu()) {
         view()->spellingMenu()->setUseMouseForMisspelledRange((e->reason() == QContextMenuEvent::Mouse));
+        p.rx() += 5;
+        p.ry() += 5;
         view()->contextMenu()->popup(mapToGlobal(p));
         e->accept();
     }
