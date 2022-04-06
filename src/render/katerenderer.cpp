@@ -520,9 +520,7 @@ QVector<QTextLayout::FormatRange> KateRenderer::decorationsForLine(const Kate::T
             backgroundAttribute = KTextEditor::Attribute::Ptr(new KTextEditor::Attribute());
         }
 
-        if (!hasCustomLineHeight()) {
-            backgroundAttribute->setBackground(config()->selectionColor());
-        }
+        backgroundAttribute->setBackground(config()->selectionColor());
         backgroundAttribute->setForeground(attribute(KTextEditor::dsNormal)->selectedForeground().color());
 
         // Create a range for the current selection
@@ -618,41 +616,6 @@ void KateRenderer::assignSelectionBrushesFromAttribute(QTextLayout::FormatRange 
     }
 }
 
-void KateRenderer::paintTextLineSelection(QPainter &paint, KateLineLayoutPtr layout, const QVector<QTextLayout::FormatRange> &selRanges)
-{
-    const QBrush selBrush = config()->selectionColor();
-    for (const auto &sel : selRanges) {
-        const int s = sel.start;
-        const int e = sel.start + sel.length;
-
-        const int startViewLine = layout->viewLineForColumn(s);
-        const int endViewLine = layout->viewLineForColumn(e);
-        if (startViewLine == endViewLine) {
-            KateTextLayout l = layout->viewLine(startViewLine);
-            const int startX = cursorToX(l, s);
-            const int endX = cursorToX(l, e);
-            const int y = startViewLine * lineHeight();
-            QRect r(startX, y, (endX - startX), lineHeight());
-            paint.fillRect(r, selBrush);
-        } else {
-            for (int l = startViewLine; l <= endViewLine; ++l) {
-                auto kateLayout = layout->viewLine(l);
-                int sx = 0;
-                int width = kateLayout.lineLayout().naturalTextWidth();
-                if (l == startViewLine) {
-                    sx = kateLayout.lineLayout().cursorToX(s);
-                } else if (l == endViewLine) {
-                    width = kateLayout.lineLayout().cursorToX(e);
-                }
-
-                const int y = l * lineHeight();
-                QRect r(sx, y, width - sx, lineHeight());
-                paint.fillRect(r, selBrush);
-            }
-        }
-    }
-}
-
 void KateRenderer::paintTextLine(QPainter &paint, KateLineLayoutPtr range, int xStart, int xEnd, const KTextEditor::Cursor *cursor, PaintTextLineFlags flags)
 {
     Q_ASSERT(range->isValid());
@@ -715,11 +678,7 @@ void KateRenderer::paintTextLine(QPainter &paint, KateLineLayoutPtr range, int x
             // Draw the text :)
             if (drawSelection) {
                 additionalFormats = decorationsForLine(range->textLine(), range->line(), true);
-                if (hasCustomLineHeight()) {
-                    paintTextLineSelection(paint, range, additionalFormats);
-                }
                 range->layout()->draw(&paint, QPoint(-xStart, 0), additionalFormats);
-
             } else {
                 range->layout()->draw(&paint, QPoint(-xStart, 0));
             }

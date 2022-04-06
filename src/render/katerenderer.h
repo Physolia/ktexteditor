@@ -373,8 +373,6 @@ public:
      */
     void paintTextLineBackground(QPainter &paint, KateLineLayoutPtr layout, int currentViewLine, int xStart, int xEnd);
 
-    void paintTextLineSelection(QPainter &paint, KateLineLayoutPtr layout, const QVector<QTextLayout::FormatRange> &selRanges);
-
     /**
      * This takes an in index, and returns all the attributes for it.
      * For example, if you have a ktextline, and want the KTextEditor::Attribute
